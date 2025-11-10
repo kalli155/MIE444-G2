@@ -31,7 +31,7 @@ bool moving = false;
 /* ===================== WHEEL / ROBOT CONSTANTS ===================== */
 const float WHEEL_DIAMETER = 2.6160;    // your wheel
 const float CPR_OUTPUT        = 1346.2f;  // counts per wheel revolution (after gearbox)
-const float TRACK_WIDTH_CM    = 16.5f;   // <--- set your robot's wheelbase (wheel-to-wheel)
+const float TRACK_WIDTH_CM    = 19.0f;   // <--- set your robot's wheelbase (wheel-to-wheel)
 
 /* Helpers */
 inline float cmToIn(float cm) { return cm / 2.54f; }
