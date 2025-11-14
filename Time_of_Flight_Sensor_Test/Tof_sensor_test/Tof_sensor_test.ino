@@ -5,14 +5,20 @@
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   delay(1000);
 
   Serial.println("Starting VL53L0X test on Arduino Mega...");
 
 
-  Wire.begin();
-  
+  Wire.begin(25,26);
+  // Initialize the sensor
+  if (!lox.begin()) {
+    Serial.println("Failed to detect VL53L0X! Check wiring.");
+    while (1);  // Stop here forever
+  }
+
+
 }
 
 void loop() {
@@ -23,12 +29,15 @@ void loop() {
     if (c == 'r') {
       VL53L0X_RangingMeasurementData_t measure;
       lox.rangingTest (&measure, false);
-
-      Serial.println(measure.RangeMilliMeter);
+      
+      Serial.println("Distance: ");
+      Serial.print(measure.RangeMilliMeter);
+      Serial.print(" mm");
     }
-
+    // Clear the input buffer
+    while (Serial.available()) Serial.read();
     
   }
-  delay(300);
+  
   
 }
