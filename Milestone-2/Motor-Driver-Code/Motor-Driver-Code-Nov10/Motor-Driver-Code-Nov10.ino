@@ -201,7 +201,7 @@ long inchesToTicks(float inches) {
   // const float circumferenceIn = PI * wheelDiameterIn;
   // float ticks = (inches * CPR_OUTPUT) / circumferenceIn;
 
-  float  ticks = CPR_OUTPUT* inches / ( WHEEL_DIAMETER * 3.14159265);
+  float  ticks = CPR_OUTPUT* inches / ( WHEEL_DIAMETER * PI);
   return lroundf(ticks);
 }
 // In-place turn: each wheel travels arc = (pi * track_width) * (deg/360)
