@@ -78,7 +78,6 @@ def move_to_wall():
     i = (frontL + frontR)/2
     block = round((i  - 2.5), 2)
     dist = b"w " + str(block) + "\n"
-    packet_tx = packetize(dist) #move fwd 1 block
     SER.write(dist)
     pause()
     sensor_readings()
@@ -430,4 +429,5 @@ def main():
 #user input for the final drop off zone
 B = input("Enter final location:")
 sensor_readings()
+
 main()
