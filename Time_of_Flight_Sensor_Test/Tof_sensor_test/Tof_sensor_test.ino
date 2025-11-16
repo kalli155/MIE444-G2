@@ -11,7 +11,7 @@ void setup() {
   Serial.println("Starting VL53L0X test on Arduino Mega...");
 
 
-  Wire.begin(25,26);
+  Wire.begin();
   // Initialize the sensor
   if (!lox.begin()) {
     Serial.println("Failed to detect VL53L0X! Check wiring.");
@@ -30,9 +30,9 @@ void loop() {
       VL53L0X_RangingMeasurementData_t measure;
       lox.rangingTest (&measure, false);
       
-      Serial.println("Distance: ");
+      Serial.print("Distance: ");
       Serial.print(measure.RangeMilliMeter);
-      Serial.print(" mm");
+      Serial.println(" mm");
     }
     // Clear the input buffer
     while (Serial.available()) Serial.read();

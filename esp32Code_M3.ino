@@ -1,0 +1,362 @@
+#include <HardwareSerial.h>
+#include <BluetoothSerial.h>
+#include <Arduino.h>
+#include <NewPing.h>
+#include <Adafruit_VL53L0X.h>
+
+
+// ---------------------- I2C COMMUNICATION ---------------------
+
+#define SCL_PIN 25
+#define SDA_PIN 26
+
+// -------------------- SERIAL COMMUNICATION --------------------
+BluetoothSerial SerialBT;         // Communication with Laptop
+HardwareSerial mySerial(2);       // Communication with Arduino
+bool MANUAL_CONTROL = false;
+
+// ------------------------ TOF SENSOR --------------------------
+Adafruit_VL53L0X lox1;
+Adafruit_VL53L0X lox2;
+Adafruit_VL53L0X lox3;
+Adafruit_VL53L0X lox4;
+
+#define ADDR1 0x30
+#define ADDR2 0x31
+#define ADDR3 0x32
+#define ADDR4 0x33
+
+#define XSHUT1 18
+#define XSHUT2 19
+#define XSHUT3 22
+#define XSHUT4 21
+
+
+// ------------------------ IR SENSOR PINS -----------------------
+
+#define IR_SIGNAL_PIN 32
+
+// -------------------- SENSOR DATA --------------------
+float u1 = 0;
+float u2 = 0;
+float u3 = 0;
+float u4 = 0;
+
+
+bool IRsense;
+
+// Create sonar objects
+
+// -------------------- LED --------------------
+
+#define LED_PIN 15
+bool led = false;
+
+// -------------------- TASKS AND TIMERS --------------------
+TaskHandle_t SerialTaskHandle;
+TaskHandle_t SendSensorData;
+TimerHandle_t xPrintData;
+TimerHandle_t xGetIRData;
+TimerHandle_t xGetTOFData;
+TimerHandle_t xControlLED;
+
+// Function prototypes
+void serialTask(void *pvParameters);
+void sendSensorData(void *pvParameters);
+void printData(TimerHandle_t xTimer);
+void getIRData(TimerHandle_t xTimer);
+void getTOFData(TimerHandle_t xTimer);
+void controlLED(TimerHandle_t xTimer);
+
+// -------------------- SETUP --------------------
+
+void setupTOFSensors() {
+  Serial.println("Initializing VL53L0X sensors...");
+
+  pinMode(XSHUT1, OUTPUT);
+  pinMode(XSHUT2, OUTPUT);
+  pinMode(XSHUT3, OUTPUT);
+  pinMode(XSHUT4, OUTPUT);
+
+  // keep all sensors in reset
+  digitalWrite(XSHUT1, LOW);
+  digitalWrite(XSHUT2, LOW);
+  digitalWrite(XSHUT3, LOW);
+  digitalWrite(XSHUT4, LOW);
+  delay(10);
+
+  Wire.begin(SDA_PIN, SCL_PIN);
+  delay(10);
+
+  // --- SENSOR 1 ---
+  digitalWrite(XSHUT1, HIGH);
+  delay(20);
+  if (!lox1.begin(ADDR1)) Serial.println("Sensor 1 FAILED");
+  else Serial.println("Sensor 1 OK");
+
+  // --- SENSOR 2 ---
+  digitalWrite(XSHUT2, HIGH);
+  delay(20);
+  if (!lox2.begin(ADDR2)) Serial.println("Sensor 2 FAILED");
+  else Serial.println("Sensor 2 OK");
+
+  // --- SENSOR 3 ---
+  digitalWrite(XSHUT3, HIGH);
+  delay(20);
+  if (!lox3.begin(ADDR3)) Serial.println("Sensor 3 FAILED");
+  else Serial.println("Sensor 3 OK");
+
+  // --- SENSOR 4 ---
+  digitalWrite(XSHUT4, HIGH);
+  delay(20);
+  if (!lox4.begin(ADDR4)) Serial.println("Sensor 4 FAILED");
+  else Serial.println("Sensor 4 OK");
+}
+
+void setup() 
+{
+  Serial.begin(9600);
+  Serial.println("Starting ESP32...");
+
+  mySerial.begin(9600, SERIAL_8N1, 16, 17);   // RX=16, TX=17
+  SerialBT.begin("ESP32_MIE444_Group2");
+  Serial.println("Bluetooth device active. Pair with 'ESP32_MIE444_Group2'");
+
+  setupTOFSensors();
+
+  // Create FreeRTOS task for serial communication
+  xTaskCreatePinnedToCore(
+    serialTask,
+    "SerialTask",
+    4096,
+    NULL,
+    1,
+    &SerialTaskHandle,
+    1 // Core 1 recommended for comms
+  );
+
+  // xTaskCreatePinnedToCore(
+  //   sendSensorData,
+  //   "SendSensorData",
+  //   4096,
+  //   NULL,
+  //   1,
+  //   &SendSensorData,
+  //   1
+  // );
+
+  // Create asynchronous timer (period = 50 ms)
+
+  xGetIRData = xTimerCreate(
+    "GetIRData",
+    pdMS_TO_TICKS(100),
+    pdTRUE,
+    (void *)0,
+    getIRData
+  );
+
+  xControlLED = xTimerCreate(
+    "Control LED",
+    pdMS_TO_TICKS(500),
+    pdTRUE,
+    (void *)0,
+    controlLED
+  );
+
+  xGetTOFData = xTimerCreate(
+    "Get TOF Readings",
+    pdMS_TO_TICKS(100),
+    pdTRUE,
+    (void *)0,
+    getTOFData
+  );
+
+  xPrintData = xTimerCreate(
+    "Print Data",
+    pdMS_TO_TICKS(1000),
+    pdTRUE,
+    (void*)0,
+    printData
+  );
+
+  pinMode(IR_SIGNAL_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  xTimerStart(xPrintData, 0);
+  xTimerStart(xGetIRData, 0);
+  xTimerStart(xControlLED, 0);
+  xTimerStart(xGetTOFData, 0);
+}
+
+void scanI2C() {
+  Serial.println("Scanning I2C bus...");
+  uint8_t count = 0;
+
+  for (uint8_t address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    uint8_t error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("  → Device found at 0x");
+      Serial.println(address, HEX);
+      count++;
+    }
+  }
+
+  if (count == 0) {
+    Serial.println("No I2C devices found.");
+  } else {
+    Serial.print("Total devices: ");
+    Serial.println(count);
+  }
+
+  Serial.println();
+}
+
+void loop() {}
+
+// -------------------- SERIAL RELAY TASK --------------------
+void serialTask(void *pvParameters) 
+{
+  for (;;) {
+    // Forward from Bluetooth → Arduino
+    if (SerialBT.available()) 
+    {
+      String cmd = SerialBT.readStringUntil('\n');
+      cmd.trim(); // remove newline or spaces
+      Serial.print("BLUETOOTH COMMAND: ");
+      Serial.println(cmd);
+      if (cmd == "u1") 
+      {
+        SerialBT.println(u1);
+        Serial.print("u1 called");
+      } 
+      else if (cmd == "u2") 
+      {
+        SerialBT.println(u2);
+        Serial.print("u1 called");
+      } 
+      else if (cmd == "u3") 
+      {
+        SerialBT.println(u3);
+      } 
+      else if (cmd == "u4") 
+      {
+        SerialBT.println(u4);
+      } 
+      else if (cmd == "i0") 
+      {
+        SerialBT.println(IRsense);
+      } 
+      else if (cmd == "light") 
+      {
+        led = !led;
+      } 
+      else if (cmd == "manualData") 
+      {
+        SerialBT.print("\t");
+        SerialBT.print(u1);
+        SerialBT.print("\t\t");
+        SerialBT.println(u3);
+
+        SerialBT.print(u2); 
+        SerialBT.print("\t\t");
+        SerialBT.print(IRsense);
+
+        SerialBT.print("\t\t");
+        SerialBT.println(u4); 
+      } 
+      else if (cmd == "getData") 
+      {
+        SerialBT.print("u1: ");
+        SerialBT.print(u1);
+        
+        SerialBT.print("u2: ");
+        SerialBT.print(u2);
+
+        SerialBT.print("u3: ");
+        SerialBT.print(u3);
+
+        SerialBT.print("u4: ");
+        SerialBT.print(u4);
+
+        SerialBT.print("i0: ");
+        SerialBT.print(IRsense);
+
+        SerialBT.println();
+      } 
+      else 
+      {
+        Serial.println("Sending Command to Arduino");
+        Serial.println("Invalid Command");
+        mySerial.println(cmd);
+        Serial.print("BT → Arduino: ");
+        Serial.println(cmd);
+      }
+    }
+
+    // Forward from Arduino → Bluetooth
+    if (mySerial.available()) {
+      String feedback = mySerial.readStringUntil('\n');
+      //SerialBT.println(feedback);
+      //Serial.print("Arduino → BT: ");
+      //Serial.println(feedback);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(10)); // Prevent watchdog reset
+  }
+}
+
+void getIRData(TimerHandle_t xTimer)
+{
+  IRsense = digitalRead(IR_SIGNAL_PIN);
+}
+
+void getTOFData(TimerHandle_t xTimer)
+{
+  VL53L0X_RangingMeasurementData_t m1, m2, m3, m4;
+
+  lox1.rangingTest(&m1, false);
+  u1 = (m1.RangeStatus == 4 ? -1 : m1.RangeMilliMeter / 10.0);
+
+  // lox2.rangingTest(&m2, false);
+  // u2 = (m2.RangeStatus == 4 ? -1 : m2.RangeMilliMeter / 10.0);
+
+  // lox3.rangingTest(&m3, false);
+  // u3 = (m3.RangeStatus == 4 ? -1 : m3.RangeMilliMeter / 10.0);
+
+  // lox4.rangingTest(&m4, false);
+  // u4 = (m4.RangeStatus == 4 ? -1 : m4.RangeMilliMeter / 10.0);
+}
+
+
+
+void controlLED(TimerHandle_t xTimer)
+{
+  if (led)
+  {
+    digitalWrite(LED_PIN, HIGH);
+  }
+  else
+  {
+    digitalWrite(LED_PIN, LOW);
+  }
+}
+
+void printData(TimerHandle_t xTimer)
+{
+  Serial.print("\t");
+  Serial.print(u1);
+  Serial.print("\t\t");
+  Serial.println(u3);
+
+  Serial.print(u2); 
+  Serial.print("\t\t");
+  Serial.print(IRsense);
+  Serial.print("\t\t");
+  Serial.println(u4); 
+
+  Serial.println();
+
+  //scanI2C();
+}
