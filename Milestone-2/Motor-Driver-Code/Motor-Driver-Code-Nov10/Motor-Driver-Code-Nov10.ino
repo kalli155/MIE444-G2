@@ -27,6 +27,7 @@ float rightSpeed = 90.0f;       // PWM duty (0-255)
 float leftSpeed  = 90.0f;
 const float MIN_PWM = 60.0f;    // raise if a wheel sticks
 bool moving = false;
+volatile bool stop = false;
 
 /* ===================== WHEEL / ROBOT CONSTANTS ===================== */
 const float WHEEL_DIAMETER = 2.6160;    // your wheel
@@ -39,6 +40,7 @@ inline float cmToIn(float cm) { return cm / 2.54f; }
 /* ===================== FREERTOS TIMER ===================== */
 TimerHandle_t xAdjustSpeeds;
 TimerHandle_t xPrintStatus;
+TimerHandle_t xStop;
 
 /* ===================== PROTOTYPES ===================== */
 // Motion primitives
@@ -51,6 +53,7 @@ void brake();
 // Balancer + telemetry
 void adjustSpeeds(TimerHandle_t);
 void printStatus(TimerHandle_t);
+void Stopping(TimerHandle_t);
 
 // Command parsing
 void processCommand(const String& input, char &letter, float &number);
@@ -92,8 +95,11 @@ void setup() {
   // Timers: balancer @50ms, status @500ms
   xAdjustSpeeds = xTimerCreate("Adjust", pdMS_TO_TICKS(50),  pdTRUE, (void*)1, adjustSpeeds);
   xPrintStatus  = xTimerCreate("Status", pdMS_TO_TICKS(500), pdTRUE, (void*)0, printStatus);
+  xStop = xTimerCreate("Stopping", pdMS_TO_TICKS(50),  pdTRUE, (void*)1, Stopping);
+  
   xTimerStart(xAdjustSpeeds, 0);
   xTimerStart(xPrintStatus,  0);
+  xTimerStart(xStop, 0);
 
   // Serial command reader
   xTaskCreate(taskSerial, "Serial", 256, NULL, tskIDLE_PRIORITY + 2, NULL);
@@ -124,6 +130,7 @@ void brake() {
   digitalWrite(in1, LOW); digitalWrite(in2, LOW);
   digitalWrite(in3, LOW); digitalWrite(in4, LOW);
   moving = false;
+  stop = false;
 }
 
 /* ===================== STRAIGHT-LINE BALANCER ===================== */
@@ -184,6 +191,27 @@ void printStatus(TimerHandle_t) {
   Serial.println(rCnt);
 }
 
+// check serial for the x stopping command
+//makes bool to stop 
+void Stopping(TimerHandle_t) {
+  if (!moving) return;            // Only look for stop while we are moving
+
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == 'x') {
+      stop = true;
+
+      // Flush the rest of the line up to newline (if there is any)
+      while (Serial.available()) {
+        char d = Serial.read();
+        if (d == '\n') break;
+      }
+      break;  // We found an x; no need to keep reading
+    }
+  }
+}
+
+
 /* ===================== COMMAND PARSER ===================== */
 void processCommand(const String& input, char &letter, float &number) {
   String cmd = input; cmd.trim();
@@ -228,6 +256,7 @@ long runLinearTicks(long targetTicks, bool backward) {
   analogWrite(leftSpeedPin,  (int)lroundf(leftSpeed));
 
   moving = true;  // start motion tracking
+  stop = false; 
 
   if (backward) rotateBackward(); else rotateForward();
 
@@ -241,7 +270,7 @@ long runLinearTicks(long targetTicks, bool backward) {
       break;
     }
 
-    if (Serial.available()) {
+    if (stop == true) {
       break;
     }
     vTaskDelay(pdMS_TO_TICKS(10)); // cooperative wait
@@ -266,6 +295,7 @@ long runTurnTicks(long targetTicks, bool rightTurn) {
   analogWrite(leftSpeedPin,  (int)lroundf(leftSpeed));
 
   moving = true; // start motion tracking
+  stop = false;
 
   if (rightTurn) rotateRight(); else rotateLeft();
 
@@ -279,7 +309,7 @@ long runTurnTicks(long targetTicks, bool rightTurn) {
       break;
     }
 
-    if (Serial.available()) {
+    if (stop == true) {
       break;
     }
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -293,7 +323,8 @@ long runTurnTicks(long targetTicks, bool rightTurn) {
 void taskSerial(void*) {
   Serial.setTimeout(50);
   for (;;) {
-    if (Serial.available()) {
+    if (!moving && Serial.available()) {
+      Serial.print("command received");
       String line = Serial.readStringUntil('\n'); // newline-terminated
       char cmd; float val;
       processCommand(line, cmd, val);
@@ -327,12 +358,6 @@ void taskSerial(void*) {
           Serial.print(F("[SER] Left ")); Serial.print(val);
           Serial.print(F(" deg -> ")); Serial.print(ticks); Serial.println(F(" ticks"));
           completed = runTurnTicks(ticks, /*rightTurn=*/false) >= ticks;
-          break;
-        }
-        case 'x': { // stop now
-          Serial.println(F("[SER] Stop"));
-          brake();
-          completed = true;
           break;
         }
         default:
