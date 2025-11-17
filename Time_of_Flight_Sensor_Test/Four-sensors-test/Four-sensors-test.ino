@@ -6,11 +6,11 @@ Adafruit_VL53L0X sensors[5];
 
 
 
-const int xshut1 = 22; //
-const int xshut2 = 24; 
-const int xshut3 = 26; 
-const int xshut4 = 28; 
-const int xshut5 = 30; //block sensor
+const int xshut1 = 18; //
+const int xshut2 = 19; 
+const int xshut3 = 22; 
+const int xshut4 = 21; 
+const int xshut5 = 2; //block sensor
 
 // Number of sensors
 const int NUM_SENSORS = 5;
@@ -19,7 +19,7 @@ const int NUM_SENSORS = 5;
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(); // initializes sda/scl
+  Wire.begin(25,26); // initializes sda/scl
 
   //initialize the xshunt
   pinMode(xshut1, OUTPUT);
