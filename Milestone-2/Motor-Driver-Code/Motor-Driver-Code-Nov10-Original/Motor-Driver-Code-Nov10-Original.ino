@@ -12,6 +12,9 @@
 #define rightSpeedPin 5     // PWM (Right)
 #define leftSpeedPin  11    // PWM (Left)
 
+#define SERVO_PIN 10
+int servoTarget = 90;
+
 /* ===================== ENCODERS ===================== */
 #define rightEncoderPin 2   // INT0 (Uno)
 #define leftEncoderPin  3   // INT1 (Uno)
@@ -97,6 +100,7 @@ void setup() {
 
   // Serial command reader
   xTaskCreate(taskSerial, "Serial", 256, NULL, tskIDLE_PRIORITY + 2, NULL);
+  xTaskCreate(taskServo, "Servo", 128, NULL, 3, NULL);
 
   vTaskStartScheduler();
 }
@@ -184,6 +188,20 @@ void printStatus(TimerHandle_t) {
   Serial.println(rCnt);
 }
 
+void taskServo(void*) {
+  pinMode(SERVO_PIN, OUTPUT);
+
+  for (;;) {
+    int pulse = angleToMicros(servoTarget);
+
+    digitalWrite(SERVO_PIN, HIGH);
+    delayMicroseconds(pulse);
+
+    digitalWrite(SERVO_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+
 /* ===================== COMMAND PARSER ===================== */
 void processCommand(const String& input, char &letter, float &number) {
   String cmd = input; cmd.trim();
@@ -209,6 +227,13 @@ long degreesToTicks(float deg) {
   const float arc_cm = PI * TRACK_WIDTH_CM * (deg / 360.0f);
   const float arc_in = cmToIn(arc_cm);
   return inchesToTicks(arc_in);
+}
+
+
+int angleToMicros(int angle) {
+  if (angle < 0) angle = 0;
+  if (angle > 180) angle = 180;
+  return 1000 + (angle * 1000) / 180;
 }
 
 /* ===================== EXECUTORS (BLOCK UNTIL DONE) ===================== */
@@ -332,6 +357,13 @@ void taskSerial(void*) {
         case 'x': { // stop now
           Serial.println(F("[SER] Stop"));
           brake();
+          completed = true;
+          break;
+        }
+        case 's': {
+          servoTarget = val;  // Angle command
+          Serial.print("Servo -> ");
+          Serial.println(servoTarget);
           completed = true;
           break;
         }
