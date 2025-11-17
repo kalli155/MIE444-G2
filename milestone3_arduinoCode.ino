@@ -106,10 +106,10 @@ void setup() {
   // Timers: balancer @50ms, status @500ms
   xAdjustSpeeds = xTimerCreate("Adjust", pdMS_TO_TICKS(50),  pdTRUE, (void*)1, adjustSpeeds);
   xPrintStatus  = xTimerCreate("Status", pdMS_TO_TICKS(500), pdTRUE, (void*)0, printStatus);
-  xSetServoPosition  = xTimerCreate("Status", pdMS_TO_TICKS(10), pdTRUE, (void*)0, setServoPosition);
+  xSetServoPosition  = xTimerCreate("Status", pdMS_TO_TICKS(100), pdTRUE, (void*)0, setServoPosition);
   xTimerStart(xAdjustSpeeds, 0);
   xTimerStart(xPrintStatus,  0);
-  xTimerStart(xSetServoPosition, 0);
+  //xTimerStart(xSetServoPosition, 0);
 
   // Serial command reader
   xTaskCreate(taskSerial, "Serial", 256, NULL, tskIDLE_PRIORITY + 2, NULL);
@@ -307,10 +307,11 @@ long runTurnTicks(long targetTicks, bool rightTurn) {
 
 /* ===================== USB SERIAL TASK ===================== */
 void taskSerial(void*) {
-  Serial.setTimeout(50);
+  Serial.setTimeout( 0);
   for (;;) {
     if (Serial.available()) {
       String line = Serial.readStringUntil('\n'); // newline-terminated
+      Serial.println("Command Recieved: " + line);
       char cmd; float val;
       processCommand(line, cmd, val);
 
@@ -351,15 +352,17 @@ void taskSerial(void*) {
           completed = true;
           break;
         }
+        case 's': { // servo motor
+          Serial.print("Servo Set Command Recieved. Setting Servo Angle to ");
+          setServoPos = val;
+          Serial.println(setServoPos);
+        }
         default:
           if (line.length() > 0) {
             Serial.print(F("[SER] Unknown: "));
             Serial.println(line);
           }
           break;
-        case 's': { // servo motor
-          setServoPos = val;
-        }
       }
       Serial.print(F("[RES] ") ) ;
       Serial.println(completed ? F("Good"): F("Bad") ); //ternary notation
