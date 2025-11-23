@@ -17,7 +17,7 @@
 //Servo set-up
 #define SERVO_PIN 10
 #define SERVO_MIN_US 1000
-#define SERVO_MAX_US 2000
+#define SERVO_MAX_US 3000
 #define SERVO_FRAME_MS 20
 volatile uint16_t servoPulseUs = 1500; 
 TimerHandle_t servoTimerHandle = NULL;
@@ -47,7 +47,7 @@ bool moving = false;
 /* ===================== WHEEL / ROBOT CONSTANTS ===================== */
 const float WHEEL_DIAMETER = 2.6160;    // your wheel
 const float CPR_OUTPUT        = 1346.2f;  // counts per wheel revolution (after gearbox)
-const float TRACK_WIDTH_CM    = 16.5f;   // <--- set your robot's wheelbase (wheel-to-wheel)
+const float TRACK_WIDTH_CM    = 19.4f;   // <wheel old battery 16, chamge if turning radius if off
 
 /* Helpers */
 inline float cmToIn(float cm) { return cm / 2.54f; }
