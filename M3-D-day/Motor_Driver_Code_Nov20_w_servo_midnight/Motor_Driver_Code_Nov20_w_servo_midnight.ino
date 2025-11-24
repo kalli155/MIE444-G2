@@ -422,22 +422,23 @@ void taskSerial(void*) {
         }
         case 'q':{ //left too close
         
-          
-          float forward_correct = 2;
-          float angle_correct = 10;
+          float rev_correct = 2;
+          float forward_correct = 1.9;
+          float angle_correct = 5;
           float angle_correct2 = 5;
 
-          long ticks1 = degreesToTicks(angle_correct);
-          long one_c = runTurnTicks(ticks1, /*rightTurn=*/true); // turn right so true
+          long rev1 = inchesToTicks(rev_correct);
+          long two_c = runLinearTicks(rev1, /*backward=*/true);
+          vTaskDelay(pdMS_TO_TICKS(200));
+
+          long turn1 = degreesToTicks(angle_correct);
+          long one_c = runTurnTicks(turn1, /*rightTurn=*/true); // turn right so true
 
           vTaskDelay(pdMS_TO_TICKS(200));
-          long ticks2 = inchesToTicks(forward_correct);
-          long two_c = runLinearTicks(ticks2, /*backward=*/false);
-          vTaskDelay(pdMS_TO_TICKS(200));
+          long for1 = inchesToTicks(forward_correct);
+          long three_c = runLinearTicks(for1, /*backward=*/false);
           
-          long tick3 = degreesToTicks(angle_correct2);
-          long three_c = runTurnTicks(tick3, /*rightTurn=*/false); // turn back left
-          vTaskDelay(pdMS_TO_TICKS(200));
+          
           completed = true; 
           break;
         }
@@ -446,20 +447,22 @@ void taskSerial(void*) {
       
           
           float forward_correct = 2;
-          float angle_correct = 10;
+          float rev_correct = 1.9;
+          float angle_correct = 5;
           float angle_correct2 = 5;
+          
+          long rev1 = inchesToTicks(rev_correct);
+          long two_c = runLinearTicks(rev1, /*backward=*/true);
+          vTaskDelay(pdMS_TO_TICKS(200));
 
-          long ticks1 = degreesToTicks(angle_correct);
-          long one_c = runTurnTicks(ticks1, /*rightTurn=*/false); // turn left so false
+          long turn1 = degreesToTicks(angle_correct);
+          long one_c = runTurnTicks(turn1, /*rightTurn=*/false); // turn left so false
           vTaskDelay(pdMS_TO_TICKS(200));
 
 
-          long ticks2 = inchesToTicks(forward_correct);
-          long two_c =  runLinearTicks(ticks2, /*backward=*/false);
-          vTaskDelay(pdMS_TO_TICKS(200));
+          long for1 = inchesToTicks(forward_correct);
+          long three_c = runLinearTicks(for1, /*backward=*/false);
 
-          long ticks3 = degreesToTicks(angle_correct2);
-          long three_c = runTurnTicks(ticks3, /*rightTurn=*/true); // turn back right
           completed = true; 
           vTaskDelay(pdMS_TO_TICKS(200));
           break;
