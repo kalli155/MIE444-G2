@@ -58,7 +58,7 @@ def sensor_readings():
     #u3
     start = end + 4
     end = data.index("u4: ")
-    frontR = float(data[start:end]) / 2.54
+    frontR = (float(data[start:end])  - 1.5) / 2.54
     
     #u4
     start = end + 4
@@ -74,13 +74,14 @@ def sensor_readings():
     start = end + 4
     end = start + 1
     ir = int(data[start:end])
+    
 
 #drive functions
 def move_distance(i):
     '''
     moves a certain amount of input blocks
     '''
-    block = i*12
+    block = i*13
     dist = "w " + str(block) + "\n"
     dist_encode = dist.encode("utf-8")
     SER.write(dist_encode)
@@ -95,7 +96,7 @@ def move_to_wall():
     block = round((i  - 2.5), 2)
     dist = b"w " + str(block) + "\n"
     dist_encode = dist.encode("utf-8")
-    SER.write(dist_encode)    
+    SER.write(dist_encode)
     pause()
     sensor_readings()
     if (frontL or frontR) > 3:
@@ -108,11 +109,16 @@ def face_west(i):
     if i == "l":
         angle = b"r 0 \n"
     elif i == "r":
-        angle = b"r 180 \n"
+        angle = b"r 90 \n"
+        SER.write(b"r 95 \n")
+        print("turning 180")
+        pause()
     elif i == "b":
         angle = b"r 90 \n"
+        print("turning right 90")
     else:
         angle = b"l 90 \n"
+        print("turning left 90")
     SER.write(angle)
     pause()
 
@@ -122,10 +128,15 @@ def face_north(i):
     '''
     if i == "l":
         angle = b"r 90\n"
+        print("turning right 90")
     elif i == "r":
-        angle = b"l 90\n"
+        angle = b"l 87\n"
+        print("turning left 90")
     elif i == "b":
-        angle = b"r 180\n"
+        angle = b"r 90 \n"
+        SER.write(b"r 95 \n")
+        pause()
+        print("turning 180")
     else:
         angle = b"r 0\n"
     SER.write(angle)
@@ -136,13 +147,18 @@ def face_south(i):
     turns the robot south for any position
     '''
     if i == "l":
-        angle = b"l 90\n"
+        angle = b"l 87\n"
+        print("turning left 90")
     elif i == "r":
         angle = b"r 90\n"
+        print("turning right 90")
     elif i == "b":
         angle = b"r 0\n"
     else:
-        angle = b"r 180\n"
+        angle = b"r 90 \n"
+        SER.write(b"r 95 \n")
+        print("turning 180")
+        pause()
     SER.write(angle)
     pause()
 
@@ -151,13 +167,18 @@ def face_east(i):
     turns the robot east for any position
     '''
     if i == "l":
-        angle = b"r 180\n"
+        angle = b"r 90 \n"
+        SER.write(b"r 95 \n")
+        print("turning 180")
+        pause()
     elif i == "r":
         angle = b"r 0\n"
     elif i == "b":
-        angle = b"l 90\n"
+        angle = b"l 87\n"
+        print("turning left 90")
     else:
         angle = b"r 90\n"
+        print("turning right 90")
     SER.write(angle)
     pause()
 
@@ -170,15 +191,7 @@ def D_move():
     pause()
     face_north("l")
     pause()
-    move_to_wall()
-    pause()
-
-def A_move():
-    '''
-    moves to the loading zone from any of the A spots
-    '''
-    pause()
-    move_to_wall()
+    move_distance(1)
     pause()
 
 def B_move():
@@ -193,7 +206,8 @@ def B_move():
     move_to_wall()
     pause()
     face_west("f")
-    A_move()
+    pause()
+    move_distance(1)
     pause()
     
 def center():
@@ -201,26 +215,51 @@ def center():
     centers the block in the 1ft x 1ft square
     '''
     sensor_readings()
-    pause()
-    fR = round((frontR - 2.5)) % 12
-    fR_move = round((frontR - 2.5) % 12, 2) / 12
-    fL = round((frontL - 2.5)) % 12
-    if (fR or fL) > 1:
+    time.sleep(1)
+    fR = round((frontR - 2)) % 12
+    fR_move = round((frontR - 2) % 12, 2) / 12
+    fL = round((frontL - 2)) % 12
+    if (fR or fL) > 1.5:
         print("not centered in the path front \n remainder:", fR)
         move_distance(fR_move) # it will move forward a lot... maybe want to keep it a function of the remainder??
-        pause()
     sensor_readings()
     r = round((right - 2.5)) % 12
     r_move = round((right - 2.5) % 12, 2) / 12
     l = round((left - 2.5)) % 12
-    if (l or r) > 1:
-        print("not centered in the path L/R \n remainder:", l, r)
+    if (l or r) > 1.5:
+        print("not centered in the path L/R \nremainder:", l, r)
         face_north("l")
-        pause()
+        print("moving right: ", r_move)
         move_distance(r_move)
-        pause()
         face_north("r")
-        pause()
+
+def orient():
+    '''
+    orients to face the wall
+    '''
+    orientation = True
+
+    #ORIENT TO FACE THE WALL:
+    while orientation:
+        sensor_readings()
+        time.sleep(LOOP_PAUSE_TIME)
+        if frontR > 30:
+            face_north("l")
+            print("turning 90 \n", "frontR: ", frontR, "frontL: ", frontL)
+        elif abs(frontR-frontL) > 0.3:
+            SER.write(b"r 7\n") #need to figure out what this range of rotation should be
+            print("great than 1 \n", "frontR: ", frontR, "frontL: ", frontL)
+        elif (frontR-frontL) > 0.005:
+            SER.write(b"l 1\n") #need to figure out what this range of rotation should be
+            print("front right larger\n", "frontR: ", frontR, "frontL: ", frontL)
+        elif (frontL-frontR) > 0.005:
+            SER.write(b"r 1\n") #need to figure out what this range of rotation should be
+            print("front left larger\n", "frontR: ", frontR, "frontL: ", frontL)
+        else:
+            orientation = False
+            print("Wall Oriented!")
+            print("front left:", frontL, "front right:", frontR)
+            print("left:", left, "right", right)
 
 #Localization functions
 def wall_dis():
@@ -229,21 +268,20 @@ def wall_dis():
     '''
     measurement = (frontL + frontR)/2
     print("average distance is: ", measurement)
-    if 0 <= measurement <= 4:
+    if 0 <= measurement <= 6:
         wall = 0
-    elif 12 <= measurement <= 16:
+    elif 10 <= measurement <= 18:
         wall = 1
-    elif 24 <= measurement <= 28:
+    elif 22 <= measurement <= 30:
         wall = 2
-    elif 36 <= measurement <= 40:
+    elif 34 <= measurement <= 42:
         wall = 3
-    elif 48 <= measurement <= 52:
+    elif 46 <= measurement <= 54:
         wall = 4
-    elif 60 <= measurement <= 64:
+    elif 58 <= measurement <= 66:
         wall = 5
     else:
         face_north("r")
-        pause()
         sensor_readings()
         print("right:", right)
         if 0 < right < 8:
@@ -270,10 +308,12 @@ def pattern_col(i):
     '''
     converts the black or white to 0 or 1
     '''
-    if i == '1': # <- double check that 1 is black from sensor
+    print("ir sensor: ", i, "\n data: ", ir)
+    if i == 1: # <- double check that 1 is black from sensor
         out = 0
     else:
         out = 1
+    print("ir sensor returning: ", out)
     return out
 
 def localize():
@@ -289,44 +329,10 @@ def localize():
         loc[i] = wall_dis()
         time.sleep(LOOP_PAUSE_TIME)
         face_north("l")
-        pause()
-        i += 1
-    return loc, pattern
-
-def main():
-    '''
-    main function to run (only is a function so that I can run simultaneously)
-    '''
-    orientation = True
-
-    #ORIENT TO FACE THE WALL:
-    while orientation:
+        if i == 2:
+            SER.write(b"r 5\n")
         time.sleep(LOOP_PAUSE_TIME)
-        sensor_readings()
-        if frontR > 60:
-            face_north("l")
-            print("turning 90 \n", "frontR: ", frontR, "frontL: ", frontL)
-        elif abs(frontR-frontL) > 0.25:
-            SER.write(b"r 7\n") #need to figure out what this range of rotation should be
-            print("great than 1 \n", "frontR: ", frontR, "frontL: ", frontL)
-        elif (frontR-frontL) > 0.05:
-            SER.write(b"l 1\n") #need to figure out what this range of rotation should be
-            print("front right larger\n", "frontR: ", frontR, "frontL: ", frontL)
-        elif (frontL-frontR) > 0.05:
-            SER.write(b"r 1\n") #need to figure out what this range of rotation should be
-            print("front left larger\n", "frontR: ", frontR, "frontL: ", frontL)
-        else:
-            orientation = False
-            print("Wall Oriented!")
-            print("front left:", frontL, "front right:", frontR)
-            print("left:", left, "right", right)
-
-    #LOCALIZATION:
-    
-    center()
-    time.sleep(LOOP_PAUSE_TIME)
-    loc, pattern = localize()
-
+        i += 1
     #check for one of 2 locations that would return the same thing
     if pattern == [0, 0, 0, 0]:
         sensor_readings()
@@ -352,107 +358,159 @@ def main():
         time.sleep(LOOP_PAUSE_TIME)
         sensor_readings()
         pause()
-        loc, pattern = localize()
+        localize()
+    return loc, pattern
 
-    print(loc)
-    print(pattern)
-    spot = pos_dictionary.name(loc, pattern)
-    print(spot)
-    print(type(spot))
-    time.sleep(LOOP_PAUSE_TIME) 
-    if spot == "":
-        time.sleep(LOOP_PAUSE_TIME)
-        spot = input("Enter approximate location:")
+def find_block(input):
+    '''
+    compares the sensor readings to detect the block
+    '''
+    block = True
+    while block:
+        sensor_readings()
+        front = (frontL + frontR) / 2 + 1
+        print("front: ", front, "\n", "block: ", block_dis)
+        time.sleep(2)
+        if (front - block_dis) > 2:
+            print("found the block")
+            block_move = (block_dis - 2)/12
+            move_distance(block_move)
+            block = False
+        elif input == "C":
+            SER.write(b"r 5\n")
+        else:
+            SER.write(b"l 5\n")
+
+#CODE STARTS HERE:
+
+#initialization
+B = input("Enter final location:")
+sensor_readings()
+SER.write(b's 0\n')
+time.sleep(LOOP_PAUSE_TIME)
+print("starting...")
+orient()
+center()
+time.sleep(LOOP_PAUSE_TIME)
+
+#localization
+loc, pattern = localize()
+print(loc)
+print(pattern)
+spot = pos_dictionary.name(loc, pattern)
+print(spot)
+time.sleep(LOOP_PAUSE_TIME) 
+if spot is None:
+    time.sleep(LOOP_PAUSE_TIME)
+    spot = input("Enter approximate location:")
     time.sleep(10)
 
-    #movement to loading zone
-    if (spot[1] == "1" and spot[0] != "B" and spot[0] != "A"):
-        face_north(spot[3])
-        move_to_wall()
-    elif (spot[:2] == "A8" or spot[:2] == "A6"):
-        face_south(spot[3])
-        move_distance(1)
-        face_west("b")
-        B_move()
-    elif (spot[0] == "B" and spot[1] != "2" and spot[1] != "1"):
-        face_west(spot[3])
-        B_move()
-    elif spot[1] == "8":
-        face_north(spot[3])
-        move_distance(2)
-        face_west("f")
-        B_move()
-    elif spot[0] == "D":
-        face_west(spot[3])
-        sensor_readings()
-        D_move()
-    elif spot[0] == "C":
-        face_south(spot[3])
-        move_to_wall()
-        face_west("b")
-        sensor_readings()
-        D_move()
-    elif (spot[0] == "A" and spot[1] != "2"):
-        face_west(spot[3])
-        A_move()
-    else:
-        print("Reached the loading zone! *not A1")
-        SER.write(b'light')
-        time.sleep(2)
-        SER.write(b'light')
-
-    #confirm at loading zone
-    time.sleep(LOOP_PAUSE_TIME)
+face = ""
+#movement to loading zone
+if (spot[:2] == "D1"):
+    face_north(spot[3])
+    move_distance(1)
+    face = "C"
+elif (spot[:2] == "C1"):
+    face_north(spot[3])
+    face = "C"
+elif (spot[:2] == "A8" or spot[:2] == "A6"):
+    face_south(spot[3])
+    move_distance(1)
+    face_west("b")
+    B_move()
+    face = "A"
+elif (spot[0] == "B" and spot[1] != "2" and spot[1] != "1"):
+    face_west(spot[3])
+    B_move()
+    face = "A"
+elif spot[1] == "8":
+    face_north(spot[3])
+    move_distance(2)
+    face_west("f")
+    B_move()
+    face = "A"
+elif spot[0] == "D":
+    face_west(spot[3])
     sensor_readings()
-    loc, pattern = localize()
-    print(loc)
-    print(pattern)
-    spot = pos_dictionary.name(loc, pattern)
-    print(spot)
-    if spot[:2] == "A1":
-        print("Reached the loading zone!")
-        SER.write(b'light')
-        time.sleep(2)
-        SER.write(b'light')
+    D_move()
+    face = "C"
+elif spot[0] == "C":
+    face_south(spot[3])
+    move_to_wall()
+    face_west("b")
+    sensor_readings()
+    D_move()
+    face = "C"
+elif (spot[:2] == "A3"):
+    face_west(spot[3])
+    face = "A"
+else:
+    print("already in the loading zone")
+    SER.write(b'light')
+    time.sleep(2)
+    SER.write(b'light')
 
-    time.sleep(5)
+time.sleep(5)
+move_distance(0.5)
+SER.write(b's 90\n')
+find_block(face)
+time.sleep(5)
+SER.write(b's 0\n')
 
-    #head to the final destination
-    if spot[:2] != "A1":
-        face_north(spot[3])
-        move_to_wall()
-        face_west("f")
-        move_to_wall()
-        spot = "A1 l"
+#confirm at loading zone
+time.sleep(LOOP_PAUSE_TIME)
+center()
+sensor_readings()
+loc, pattern = localize()
+print(loc)
+print(pattern)
+spot = pos_dictionary.name(loc, pattern)
+print(spot)
 
-    if B[1] == "1":
-        face_south(spot[3])
-        move_to_wall()
-        face_east("b")
+if spot is None:
+    time.sleep(LOOP_PAUSE_TIME)
+    spot = input("Enter approximate location:")
+    time.sleep(10)
+
+if spot[:2] == "A1":
+    print("Reached the loading zone!")
+    SER.write(b'light')
+    time.sleep(2)
+    SER.write(b'light')
+
+#head to the final destination
+if spot[:2] != "A1":
+    face_north(spot[3])
+    move_to_wall()
+    face_west("f")
+    move_to_wall()
+    spot = "A1 l"
+
+if B[1] == "1":
+    face_south(spot[3])
+    move_to_wall()
+    face_east("b")
+    move_distance(2)
+    face_north("r")
+    move_to_wall()
+else:
+    face_east(spot[3])
+    move_to_wall()
+    face_south("r")
+    move_to_wall()
+    face_east("b")
+    if B[1] == "2":
         move_distance(2)
         face_north("r")
         move_to_wall()
     else:
-        face_east(spot[3])
         move_to_wall()
-        face_south("r")
-        move_to_wall()
-        face_east("b")
-        if B[1] == "2":
-            move_distance(2)
+        if B[1] == "3":
             face_north("r")
             move_to_wall()
         else:
+            face_south("r")
             move_to_wall()
-            if B[1] == "3":
-                face_north("r")
-                move_to_wall()
-            else:
-                face_south("r")
-                move_to_wall()
-    print("Reached the final destination!")
-
-#user input for the final drop off zone
-B = input("Enter final location:")
-sensor_readings()
-main()
+print("Reached the final destination!")
+SER.write(b's 0\n')

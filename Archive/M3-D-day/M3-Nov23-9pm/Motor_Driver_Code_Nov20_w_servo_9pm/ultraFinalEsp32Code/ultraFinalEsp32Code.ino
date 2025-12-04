@@ -12,6 +12,7 @@
 BluetoothSerial SerialBT;         // Communication with Laptop
 HardwareSerial mySerial(2);       // Communication with Arduino
 bool MANUAL_CONTROL = false;
+bool localization_done = false;
 
 // ------------------------ TOF SENSOR --------------------------
 Adafruit_VL53L0X lox1;

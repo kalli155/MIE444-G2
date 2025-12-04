@@ -206,20 +206,20 @@ void adjustSpeeds(TimerHandle_t) {
   prevR = (long)rCnt;
   prevL = (long)lCnt;
 
-  long e = dR - dL;                 // positive => right faster
-  const float Kp = 0.40f;           // tune 0.3–0.8
-  const float Ki = 0.00f;           // add 0.005–0.015 when stable
+  long e = dR - dL; // positive => right faster
+  const float Kp = 0.40f;  // tune 0.3–0.8
+  const float Ki = 0.00f;           
   const float iMax = 25.0f;
 
-  if (abs(e) < 1) e = 0;            // deadband
+  if (abs(e) < 1) e = 0;           
   iTerm += Ki * (float)e;
   if (iTerm > iMax)  iTerm = iMax;
   if (iTerm < -iMax) iTerm = -iMax;
 
-  float u = Kp * (float)e + iTerm;  // correction
+  float u = Kp * (float)e + iTerm; 
 
-  rightSpeed -= u;                  // slow fast side
-  leftSpeed  += u;                  // speed slow side
+  rightSpeed -= u;    // slow fast side
+  leftSpeed  += u;   // speed slow side
 
   if (rightSpeed > 255) rightSpeed = 255;
   if (leftSpeed  > 255) leftSpeed  = 255;

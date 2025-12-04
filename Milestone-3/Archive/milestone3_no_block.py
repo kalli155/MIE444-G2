@@ -42,7 +42,6 @@ def sensor_readings():
     global frontR
     global left
     global right
-    global block_dis
     global ir
     
     #u1
@@ -81,7 +80,7 @@ def move_distance(i):
     moves a certain amount of input blocks
     '''
     block = i*12
-    dist = "w " + str(block) + "\n"
+    dist = b"w " + str(block) + "\n"
     dist_encode = dist.encode("utf-8")
     SER.write(dist_encode)
     pause()
@@ -196,10 +195,8 @@ def B_move():
     A_move()
     pause()
     
-def center():
-    '''
-    centers the block in the 1ft x 1ft square
-    '''
+#Center the bot in the path
+def center(): #can get negatives if to close...
     sensor_readings()
     pause()
     fR = round((frontR - 2.5)) % 12
@@ -270,7 +267,7 @@ def pattern_col(i):
     '''
     converts the black or white to 0 or 1
     '''
-    if i == '1': # <- double check that 1 is black from sensor
+    if i == 'True':
         out = 0
     else:
         out = 1
@@ -306,13 +303,13 @@ def main():
         if frontR > 60:
             face_north("l")
             print("turning 90 \n", "frontR: ", frontR, "frontL: ", frontL)
-        elif abs(frontR-frontL) > 0.25:
+        elif abs(frontR-frontL) > 0.5:
             SER.write(b"r 7\n") #need to figure out what this range of rotation should be
             print("great than 1 \n", "frontR: ", frontR, "frontL: ", frontL)
-        elif (frontR-frontL) > 0.05:
+        elif (frontR-frontL) > 0.1:
             SER.write(b"l 1\n") #need to figure out what this range of rotation should be
             print("front right larger\n", "frontR: ", frontR, "frontL: ", frontL)
-        elif (frontL-frontR) > 0.05:
+        elif (frontL-frontR) > 0.1:
             SER.write(b"r 1\n") #need to figure out what this range of rotation should be
             print("front left larger\n", "frontR: ", frontR, "frontL: ", frontL)
         else:
@@ -358,12 +355,7 @@ def main():
     print(pattern)
     spot = pos_dictionary.name(loc, pattern)
     print(spot)
-    print(type(spot))
-    time.sleep(LOOP_PAUSE_TIME) 
-    if spot == "":
-        time.sleep(LOOP_PAUSE_TIME)
-        spot = input("Enter approximate location:")
-    time.sleep(10)
+    time.sleep(LOOP_PAUSE_TIME)
 
     #movement to loading zone
     if (spot[1] == "1" and spot[0] != "B" and spot[0] != "A"):
